@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: finn-investor-desk
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: HYDE_INFERENCE_API_KEY
+        sync: false
+      - key: LLM_MODEL
+        value: hyde/glm-5.3-flash
+      - key: FINN_AUTO_REFRESH
+        value: "true"
+      - key: FINN_DAILY_MODEL_CALL_LIMIT
+        value: "60"
+      - key: PORT
+        value: "10000"

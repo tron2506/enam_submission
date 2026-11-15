@@ -1,0 +1,56 @@
+# Secrets (commit only the placeholder example)
+.env
+.env.*
+!.env.example
+PLAN.md
+challenge.md
+reference.md
+
+# Python environments, bytecode, test/tool caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# JavaScript dependencies, generated types and build output
+node_modules/
+.next/
+out/
+dist/
+build/
+next-env.d.ts
+*.tsbuildinfo
+coverage/
+playwright-report/
+test-results/
+
+# Runtime data; the public demo snapshot is intentionally tracked
+data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite*
+
+# Generated screenshots, staging copies and packages
+artifacts/
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.log
+
+# Local editor, deployment and workspace metadata
+.vscode/
+.idea/
+.openai/
+.agents/
+.codex/
+.aws/
+.DS_Store
+Thumbs.db
