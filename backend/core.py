@@ -14,26 +14,45 @@ ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / ".env", override=False)
 DATA = Path(os.getenv("FINN_DATA_DIR", str(ROOT / "data")))
 DATA.mkdir(parents=True, exist_ok=True)
-PORTFOLIO = [
-    ("RELIANCE", "Reliance Industries", "Energy"),
-    ("INFY", "Infosys", "Technology"),
-    ("TCS", "Tata Consultancy Services", "Technology"),
-    ("HDFCBANK", "HDFC Bank", "Banking"),
-    ("ICICIBANK", "ICICI Bank", "Banking"),
-    ("BHARTIARTL", "Bharti Airtel", "Telecom"),
-    ("LT", "Larsen & Toubro", "Industrials"),
-    ("SUNPHARMA", "Sun Pharma", "Healthcare"),
-    ("TITAN", "Titan Company", "Consumer"),
-    ("MARUTI", "Maruti Suzuki", "Automobiles"),
-    ("TATASTEEL", "Tata Steel", "Materials"),
-    ("ASIANPAINT", "Asian Paints", "Consumer"),
-    ("TRENT", "Trent", "Retail"),
-    ("DIXON", "Dixon Technologies", "Electronics"),
-    ("KPITTECH", "KPIT Technologies", "Technology"),
-    ("APLAPOLLO", "APL Apollo Tubes", "Materials"),
-    ("KAYNES", "Kaynes Technology", "Electronics"),
-    ("CAMS", "CAMS", "Financial services"),
+# Market caps are the owner's supplied snapshot in INR crore, not live quotes.
+COMPANIES = [
+    ("RELIANCE", "Reliance Industries Ltd", "Energy", 1812818.89),
+    ("BHARTIARTL", "Bharti Airtel Ltd", "Telecom", 1314499.14),
+    ("JPL", "Jio Platforms Ltd", "Telecom", 1290093.13),
+    ("HDFCBANK", "HDFC Bank Ltd", "Banking", 1239299.80),
+    ("ICICIBANK", "ICICI Bank Ltd", "Banking", 1137500.21),
+    ("SBIN", "State Bank of India (SBI)", "Banking", 997384.35),
+    ("TCS", "Tata Consultancy Services Ltd (TCS)", "Technology", 871959.09),
+    ("BAJFINANCE", "Bajaj Finance Ltd", "Financial services", 694318.73),
+    ("LT", "Larsen & Toubro Ltd (L&T)", "Industrials", 569491.67),
+    ("LICI", "Life Insurance Corporation of India (LIC)", "Insurance", 505746.82),
+    ("NSE", "National Stock Exchange of India Ltd (NSE)", "Financial services", 492537.38),
+    ("KOTAKBANK", "Kotak Mahindra Bank Ltd", "Banking", 485058.69),
+    ("HINDUNILVR", "Hindustan Unilever Ltd (HUL)", "Consumer", 466393.87),
+    ("INFY", "Infosys Ltd", "Technology", 462645.31),
+    ("SUNPHARMA", "Sun Pharmaceutical Industries Ltd", "Healthcare", 451280.28),
+    ("ADANIPORTS", "Adani Ports and Special Economic Zone Ltd", "Industrials", 438708.37),
+    ("TITAN", "Titan Company Ltd", "Consumer", 430611.80),
+    ("AXISBANK", "Axis Bank Ltd", "Banking", None),
 ]
+PORTFOLIO = [(s, n, sector) for s, n, sector, _ in COMPANIES]
+CATALOG = {
+    s: {"symbol": s, "name": n, "sector": sector, "market_cap_cr": cap,
+        "market_cap_source": "User-supplied snapshot" if cap is not None else None,
+        "price_supported": s != "NSE"}
+    for s, n, sector, cap in COMPANIES
+}
+
+
+def company(symbol):
+    return CATALOG.get(symbol) or get("company:" + symbol) or {
+        "symbol": symbol, "name": symbol, "sector": "Other", "price_supported": True,
+    }
+
+
+def selected_companies():
+    return [company(s) for s in get("settings", DEFAULT_SETTINGS)["symbols"]]
+
 
 
 def now():

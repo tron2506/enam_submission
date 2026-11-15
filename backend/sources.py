@@ -10,7 +10,7 @@ from urllib.parse import urlparse, urljoin
 import httpx
 import pymupdf as fitz
 from bs4 import BeautifulSoup
-from .core import DATA, PORTFOLIO, get, put, now, uid, classify, price_signal, ticker
+from .core import DATA, selected_companies, get, put, now, uid, classify, price_signal, ticker
 
 HEADERS = {"User-Agent": "Mozilla/5.0", "Accept-Language": "en-US,en;q=0.9"}
 SEM = asyncio.Semaphore(4)
@@ -50,7 +50,12 @@ async def prices(symbol):
             f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}.NS?interval=1d&range=3mo&events=splits"
         )
     )
+    if not raw.get("chart", {}).get("result"):
+        raise ValueError("No NSE price data found for this symbol.")
     r = raw["chart"]["result"][0]
+    meta = r.get("meta", {})
+    if meta.get("exchangeName") not in ("NSI", "NSE") or meta.get("instrumentType") != "EQUITY":
+        raise ValueError("Enter an NSE-listed equity symbol.")
     q = r["indicators"]["quote"][0]
     bars = []
     splits = {int(v["date"]) for v in r.get("events", {}).get("splits", {}).values()}
@@ -75,6 +80,7 @@ async def prices(symbol):
         raise ValueError("Not enough EOD history")
     result.update(
         symbol=symbol,
+        name=meta.get("longName") or meta.get("shortName") or symbol,
         fetched_at=now(),
         source=f"https://finance.yahoo.com/quote/{symbol}.NS/history/",
     )
@@ -210,7 +216,7 @@ async def refresh():
         except Exception as e:
             status["errors"].append({"source": "price", "symbol": s, "error": str(e)[:180]})
 
-    await asyncio.gather(*(one(x[0]) for x in PORTFOLIO))
+    await asyncio.gather(*(one(c["symbol"]) for c in selected_companies() if c.get("price_supported", True)))
     try:
         status["announcements"] = await announcements()
     except Exception as e:

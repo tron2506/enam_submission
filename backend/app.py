@@ -10,7 +10,7 @@ import time
 from collections import defaultdict, deque
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
-from .core import PORTFOLIO, DEFAULT_SETTINGS, get, put, keys, alerts, now, ticker
+from .core import selected_companies, company, connect, DEFAULT_SETTINGS, get, put, keys, alerts, now, ticker
 from . import sources, research
 
 jobs = {}
@@ -143,8 +143,8 @@ def overview():
     settings = get("settings", DEFAULT_SETTINGS)
     return {
         "companies": [
-            {"symbol": s, "name": n, "sector": sector, "price": get("price:" + s)}
-            for s, n, sector in PORTFOLIO
+            {**c, "price": get("price:" + c["symbol"]) if c.get("price_supported", True) else None}
+            for c in selected_companies()
         ],
         "settings": settings,
         "refresh": get("refresh"),
@@ -202,6 +202,39 @@ def settings(body: Settings):
     d["symbols"] = [ticker(s) for s in d["symbols"]]
     put("settings", d)
     return d
+
+
+class Replacement(BaseModel):
+    old_symbol: str
+    new_symbol: str
+
+
+@app.post("/api/watchlist/replace")
+async def replace_company(body: Replacement):
+    """Validate first, then atomically replace one slot without losing other edits."""
+    import json
+
+    old, new = ticker(body.old_symbol), ticker(body.new_symbol)
+    current = get("settings", DEFAULT_SETTINGS)
+    if old not in current["symbols"]:
+        raise HTTPException(409, "This company is no longer in the watchlist. Reload and try again.")
+    if new in current["symbols"]:
+        raise HTTPException(400, "This company is already in your watchlist.")
+    try:
+        price = await sources.prices(new)
+    except Exception:
+        raise HTTPException(400, "Could not verify this NSE equity. Check the ticker or retry when the price source is available. Your watchlist is unchanged.")
+    meta = {**company(new), "name": company(new).get("name") if company(new).get("name") != new else price.get("name", new)}
+    with connect() as db:
+        db.execute("BEGIN IMMEDIATE")
+        row = db.execute("SELECT value FROM kv WHERE key='settings'").fetchone()
+        current = json.loads(row[0]) if row else dict(DEFAULT_SETTINGS)
+        if old not in current["symbols"] or new in current["symbols"]:
+            raise HTTPException(409, "Watchlist changed during validation. Reload and try again.")
+        current["symbols"] = [new if s == old else s for s in current["symbols"]]
+        db.execute("INSERT OR REPLACE INTO kv VALUES (?,?)", ("company:" + new, json.dumps(meta)))
+        db.execute("INSERT OR REPLACE INTO kv VALUES (?,?)", ("settings", json.dumps(current)))
+    return {"company": {**meta, "price": price}, "settings": current}
 
 
 @app.post("/api/refresh")

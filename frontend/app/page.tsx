@@ -1,4 +1,11 @@
 "use client";
+import {
+  MarketOverview,
+  Watchlist,
+  AssessmentChart,
+  ResultsChart,
+  PriceChart,
+} from "./components/market";
 import { useEffect, useState, useCallback } from "react";
 import {
   ArrowUpRight,
@@ -116,7 +123,7 @@ export default function Home() {
     [busy, setBusy] = useState(""),
     [progress, setProgress] = useState(""),
     [research, setResearch] = useState<Obj | null>(null),
-    [symbol, setSymbol] = useState("DIXON"),
+    [symbol, setSymbol] = useState("INFY"),
     [question, setQuestion] = useState(""),
     [answer, setAnswer] = useState<Obj | null>(null),
     [citation, setCitation] = useState<Obj | null>(null),
@@ -152,10 +159,7 @@ export default function Home() {
           return;
         } catch {}
       }
-      setError(
-        "Cannot reach the Python API. Start the backend or configure NEXT_PUBLIC_API_URL. " +
-          e.message,
-      );
+      setError("The server is unavailable. Please retry shortly. " + e.message);
     }
   }, [days]);
   useEffect(() => {
@@ -360,7 +364,7 @@ export default function Home() {
             <strong>{e.symbol}</strong>
             <span className="company-name">{company?.name || e.company}</span>
             <span className={"pill " + e.priority}>
-              {e.priority === "high" ? "HIGH SIGNAL" : label(e.category)}
+              {e.priority === "high" ? "PRIORITY" : label(e.category)}
             </span>
             <span className="event-date">{date(e.published_at)}</span>
           </div>
@@ -441,7 +445,7 @@ export default function Home() {
         <nav>
           {[
             { id: "today", icon: LayoutGrid, name: "Today" },
-            { id: "research", icon: Sparkles, name: "Research" },
+            { id: "research", icon: BookOpen, name: "Research" },
             { id: "alerts", icon: Bell, name: "Alerts" },
             { id: "saved", icon: Bookmark, name: "Saved" },
           ].map((n) => (
@@ -456,26 +460,15 @@ export default function Home() {
               <n.icon size={18} />
               <span>{n.name}</span>
               {n.id === "alerts" && unread > 0 && <b>{unread}</b>}
-              {n.id === "research" && <small>AI</small>}
             </button>
           ))}
         </nav>
-        <div className="sidebar-note">
-          <span className="green-dot" />
-          Built on primary sources
-          <p>
-            Less noise.
-            <br />
-            More conviction.
-          </p>
-          <ShieldCheck size={20} />
-        </div>
         <button
           className={"settings-nav " + (tab === "settings" ? "active" : "")}
           onClick={() => setTab("settings")}
         >
           <Settings2 size={17} />
-          Watch settings
+          Watchlist & settings
         </button>
         <div className="profile">
           <span className="profile-avatar">D</span>
@@ -493,7 +486,7 @@ export default function Home() {
           <div className="topbar-right">
             <span className="market-status">
               <span className="green-dot" />
-              EOD intelligence
+              End-of-day data
             </span>
             <button
               className="icon-button"
@@ -508,27 +501,27 @@ export default function Home() {
         </header>
         <main>
           <div className="page-heading">
-            <div className="eyebrow">YOUR EDGE, EVERY DAY</div>
+            <div className="eyebrow">INDIAN EQUITIES</div>
             <div className="title-row">
               <div>
                 <h1>
                   {tab === "today"
-                    ? "Know what matters."
+                    ? "Overview"
                     : tab === "research"
-                      ? "Go beyond the headline."
+                      ? "Company research"
                       : tab === "alerts"
-                        ? "Your watch, working."
+                        ? "Alerts"
                         : tab === "saved"
-                          ? "Worth a second look."
-                          : "Make it your signal."}
+                          ? "Saved filings"
+                          : "Watchlist & alerts"}
                 </h1>
                 <p>
                   {tab === "today"
-                    ? "The important changes across your portfolio. Everything else, quietly in the background."
+                    ? "Prices, disclosures and research for the companies you follow."
                     : tab === "research"
                       ? "What management said. What the numbers show. Evidence on both sides."
                       : tab === "settings"
-                        ? "You decide what unusual means. FINN watches for it."
+                        ? "Replace companies and adjust your alert thresholds."
                         : tab === "alerts"
                           ? "Material disclosures and market moves that meet your rules."
                           : "Filings you’ve kept for a closer read."}
@@ -538,9 +531,7 @@ export default function Home() {
                 <Clock size={14} />
                 {date(liveDate)}
                 <small>
-                  {snapshot
-                    ? "Dated source replay"
-                    : "Source-backed intelligence"}
+                  {snapshot ? "Dated source replay" : "End-of-day data"}
                 </small>
               </div>
             </div>
@@ -598,6 +589,25 @@ export default function Home() {
             </div>
           ) : (
             <>
+              {tab === "today" && (
+                <>
+                  <MarketOverview companies={companies} />
+                  <Watchlist
+                    companies={companies}
+                    onResearch={openResearch}
+                    disabled={snapshot || !!busy}
+                    onReplace={async (old, next) => {
+                      const result = await jsonRequest(
+                        "/watchlist/replace",
+                        "POST",
+                        { old_symbol: old, new_symbol: next },
+                      );
+                      setSettings(result.settings);
+                      await load();
+                    }}
+                  />
+                </>
+              )}
               {(tab === "today" || tab === "saved") && (
                 <div className="desk-layout">
                   <section className="feed-column">
@@ -620,7 +630,7 @@ export default function Home() {
                             {high}
                             <em>need attention</em>
                           </strong>
-                          <small>High-signal disclosures</small>
+                          <small>Priority disclosures</small>
                         </span>
                       </div>
                       <div>
@@ -673,7 +683,7 @@ export default function Home() {
                     <div className="feed-tools">
                       <div className="filter-tabs">
                         {[
-                          ["all", "All signals"],
+                          ["all", "All filings"],
                           ["results", "Results"],
                           ["management_change", "Leadership"],
                           ["M&A", "M&A"],
@@ -699,7 +709,7 @@ export default function Home() {
                     </div>
                     <div className="section-kicker">
                       <span className="dot high" />
-                      PRIORITIZED FOR YOU
+                      DISCLOSURES
                       <span>{important.length} disclosures</span>
                     </div>
                     <div className="event-list">
@@ -710,7 +720,7 @@ export default function Home() {
                     {important.length === 0 && (
                       <div className="empty">
                         <CheckCheck size={28} />
-                        <h3>You’re all caught up.</h3>
+                        <h3>No filings in this window.</h3>
                         <p>
                           No priority disclosures match this window. Try seven
                           days or another category.
@@ -757,34 +767,9 @@ export default function Home() {
                     </div>
                   </section>
                   <aside className="right-column">
-                    <div className="research-promo">
-                      <div className="promo-top">
-                        <span>
-                          <Sparkles size={16} />
-                          FINN RESEARCH
-                        </span>
-                        <span className="mini-badge">PRIMARY SOURCES</span>
-                      </div>
-                      <h2>
-                        Trust the story.
-                        <br />
-                        <i>Check the numbers.</i>
-                      </h2>
-                      <p>
-                        Compare management’s promises with what actually
-                        happened.
-                      </p>
-                      <button onClick={() => openResearch("DIXON")}>
-                        Explore Dixon <ArrowUpRight size={17} />
-                      </button>
-                      <div className="promo-foot">
-                        <FileText size={12} />
-                        Annual reports + earnings calls
-                      </div>
-                    </div>
                     <div className="watchlist">
                       <div className="panel-heading">
-                        <h3>On your radar</h3>
+                        <h3>Closing prices</h3>
                         <button
                           aria-label="Edit watchlist"
                           onClick={() => setTab("settings")}
@@ -797,7 +782,7 @@ export default function Home() {
                       </div>
                       {companies
                         .filter((c: Obj) => settingsSymbols.includes(c.symbol))
-                        .slice(0, 8)
+                        .slice(0, 6)
                         .map((c: Obj) => (
                           <button
                             className="watch-row"
@@ -841,17 +826,6 @@ export default function Home() {
                         Manage {settingsSymbols.length} companies{" "}
                         <ArrowRight size={14} />
                       </button>
-                    </div>
-                    <div className="source-status">
-                      <span className="green-dot" />
-                      <div>
-                        Evidence comes first
-                        <small>
-                          Exchange filings. Company reports.
-                          <br />
-                          No broker notes. No news summaries.
-                        </small>
-                      </div>
                     </div>
                     <button
                       className="refresh-button"
@@ -903,14 +877,8 @@ export default function Home() {
                       <div className="research-orbit">
                         <Sparkles size={35} />
                       </div>
-                      <div className="eyebrow">
-                        A STORY IS ONLY HALF THE PICTURE
-                      </div>
-                      <h2>
-                        Put management’s words
-                        <br />
-                        next to their results.
-                      </h2>
+                      <div className="eyebrow">COMPANY DOCUMENTS</div>
+                      <h2>Management guidance & reported results</h2>
                       <p>
                         FINN reads annual reports and earnings-call transcripts,
                         then connects each conclusion to the original page.
@@ -966,6 +934,16 @@ export default function Home() {
                           Refresh research
                         </button>
                       </div>
+                      {companies.find(
+                        (c: Obj) => c.symbol === research.symbol,
+                      ) && (
+                        <PriceChart
+                          key={research.symbol}
+                          company={companies.find(
+                            (c: Obj) => c.symbol === research.symbol,
+                          )}
+                        />
+                      )}
                       <div className="research-grid">
                         <section className="research-panel">
                           <h3>
@@ -991,9 +969,7 @@ export default function Home() {
                       <section className="comparison-panel">
                         <div className="panel-heading">
                           <div>
-                            <div className="eyebrow">
-                              THE ACCOUNTABILITY CHECK
-                            </div>
+                            <div className="eyebrow">GUIDANCE REVIEW</div>
                             <h2>Promises vs. delivery</h2>
                           </div>
                           <span className="outline-pill">
@@ -1005,6 +981,7 @@ export default function Home() {
                           Explicit guidance is compared only when the metric,
                           scope, and period match.
                         </p>
+                        <AssessmentChart comparisons={research.comparisons} />
                         {research.comparisons.length ? (
                           <div className="comparison-table">
                             <div className="comparison-header">
@@ -1320,49 +1297,33 @@ export default function Home() {
                       ))}
                     </div>
                   </section>
-                  <section className="research-panel">
-                    <h3>
-                      <LayoutGrid size={17} />
-                      Your portfolio
-                    </h3>
-                    <p className="muted">
-                      A mock portfolio across sectors and company sizes.
-                      Research supports other NSE tickers too.
-                    </p>
-                    <div className="portfolio-options">
-                      {companies.map((c: Obj) => (
-                        <label key={c.symbol}>
-                          <input
-                            type="checkbox"
-                            checked={settings.symbols.includes(c.symbol)}
-                            onChange={() =>
-                              setSettings({
-                                ...settings,
-                                symbols: settings.symbols.includes(c.symbol)
-                                  ? settings.symbols.filter(
-                                      (x: string) => x !== c.symbol,
-                                    )
-                                  : [...settings.symbols, c.symbol],
-                              })
+                  <Watchlist
+                    companies={companies}
+                    onResearch={openResearch}
+                    disabled={snapshot || !!busy}
+                    onReplace={async (old, next) => {
+                      const result = await jsonRequest(
+                        "/watchlist/replace",
+                        "POST",
+                        { old_symbol: old, new_symbol: next },
+                      );
+                      // Preserve unsaved threshold edits while adopting the new symbols.
+                      setSettings((previous: Obj | null) => ({
+                        ...previous,
+                        symbols: result.settings.symbols,
+                      }));
+                      setOverview((previous: Obj | null) =>
+                        previous
+                          ? {
+                              ...previous,
+                              companies: previous.companies.map((c: Obj) =>
+                                c.symbol === old ? result.company : c,
+                              ),
                             }
-                          />
-                          <div>
-                            <strong>{c.symbol}</strong>
-                            <small>
-                              {c.name} · {c.sector}
-                            </small>
-                          </div>
-                          <span
-                            className={
-                              (c.price?.change || 0) >= 0 ? "up" : "down"
-                            }
-                          >
-                            {pct(c.price?.change ?? null)}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  </section>
+                          : previous,
+                      );
+                    }}
+                  />
                   <button
                     className="primary"
                     disabled={!!busy}
@@ -1401,15 +1362,15 @@ export default function Home() {
               <AppIcon />
               FINN
             </span>
-            <span>Clarity is a competitive advantage.</span>
-            <span>PRIMARY SOURCES. CONSIDERED SIGNALS.</span>
+            <span>Company filings & end-of-day prices.</span>
+            <span>FINN / Investor desk</span>
           </footer>
         </main>
       </div>
       <nav className="mobile-nav">
         {[
           { id: "today", icon: LayoutGrid, name: "Today" },
-          { id: "research", icon: Sparkles, name: "Research" },
+          { id: "research", icon: BookOpen, name: "Research" },
           { id: "alerts", icon: Bell, name: "Alerts" },
           { id: "saved", icon: Bookmark, name: "Saved" },
           { id: "settings", icon: Settings2, name: "Settings" },
@@ -1489,12 +1450,16 @@ export default function Home() {
             </div>
             {selected.category === "results" && (
               <section className="results-section">
-                <h3>First cut of the numbers</h3>
+                <h3>Reported results</h3>
                 {analysis ? (
                   <>
                     <p>
                       {analysis.period} · {analysis.scope} · {analysis.unit}
                     </p>
+                    <ResultsChart
+                      metrics={analysis.metrics}
+                      unit={analysis.unit}
+                    />
                     <div className="results-table">
                       <div>
                         <strong>Metric</strong>

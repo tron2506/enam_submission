@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./desk.css";
 export const metadata: Metadata = {
-  title: "FINN — Know what matters.",
+  title: "FINN — Investor desk",
   description:
     "A source-backed intelligence workspace for Indian equity investors.",
 };

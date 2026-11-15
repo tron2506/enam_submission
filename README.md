@@ -1,6 +1,8 @@
 # FINN — Know what matters.
 
-A mobile-first investor workspace for 18 NSE-listed companies: prioritized filings, configurable alerts, results extraction, and company research grounded in annual reports and earnings-call transcripts.
+A responsive investor workspace with 18 default companies: price and volume charts, daily-move comparisons, prioritized filings, configurable alerts, results extraction, and company research grounded in annual reports and earnings-call transcripts.
+
+The watchlist uses the supplied 18-company selection. Each row has a **Replace** control: enter an NSE equity ticker and confirm; the server verifies its price feed and replaces that slot in prices, filings, and alerts. Duplicate or unverifiable tickers leave the list unchanged. Market-cap bars use the owner-supplied snapshot in INR crore, not live valuations; Axis Bank has no supplied value. Jio Platforms uses `JPL`; missing provider coverage is shown as unavailable. NSE Ltd remains in the list with its supplied valuation, but has no supported NSE price feed. Research assessments and extracted quarterly results also have graphical summaries, with source citations retained.
 
 **Deployment status:** the source is prepared for a single cloud-hosted Docker service. A complete cloud deployment still needs your hosting account and API secret. The earlier Sites preview is a separate static deployment and is not the final full-stack submission. Do not submit the old tunnel links.
 
