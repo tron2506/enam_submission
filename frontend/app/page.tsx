@@ -6,6 +6,7 @@ import {
   ResultsChart,
   PriceChart,
 } from "./components/market";
+import CompanySearch, { resolveCompany } from "./components/company-search";
 import { useEffect, useState, useCallback } from "react";
 import {
   ArrowUpRight,
@@ -249,6 +250,12 @@ export default function Home() {
     }
   }
   async function openResearch(s: string) {
+    try {
+      s = resolveCompany(s, overview?.companies || []);
+    } catch (e: any) {
+      setError(e.message);
+      return;
+    }
     setSymbol(s);
     setTab("research");
     setResearch(null);
@@ -845,24 +852,12 @@ export default function Home() {
               )}
               {tab === "research" && (
                 <div className="research-view">
-                  <form
-                    className="research-search"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      openResearch(symbol.toUpperCase().trim());
-                    }}
-                  >
-                    <Search size={20} />
-                    <input
-                      aria-label="NSE ticker"
-                      value={symbol}
-                      onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-                      placeholder="Enter any NSE ticker, e.g. INFY"
-                    />
-                    <button className="primary" type="submit">
-                      Open company <ArrowRight size={16} />
-                    </button>
-                  </form>
+                  <CompanySearch
+                    companies={companies}
+                    value={symbol}
+                    onChange={setSymbol}
+                    onOpen={openResearch}
+                  />
                   <div className="example-tickers">
                     <span>Start exploring</span>
                     {["INFY", "TCS", "DIXON"].map((s) => (
@@ -886,9 +881,15 @@ export default function Home() {
                       <button
                         className="primary"
                         disabled={!!busy}
-                        onClick={() =>
-                          job("/research/" + symbol, (r) => setResearch(r))
-                        }
+                        onClick={() => {
+                          try {
+                            const resolved = resolveCompany(symbol, companies);
+                            setSymbol(resolved);
+                            job("/research/" + resolved, (r) => setResearch(r));
+                          } catch (e: any) {
+                            setError(e.message);
+                          }
+                        }}
                       >
                         <Sparkles size={16} />
                         Research {symbol}

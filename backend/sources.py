@@ -45,17 +45,24 @@ async def fetch(url, binary=False):
 
 
 async def prices(symbol):
-    raw = json.loads(
-        await fetch(
-            f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}.NS?interval=1d&range=3mo&events=splits"
-        )
-    )
-    if not raw.get("chart", {}).get("result"):
-        raise ValueError("No NSE price data found for this symbol.")
-    r = raw["chart"]["result"][0]
-    meta = r.get("meta", {})
-    if meta.get("exchangeName") not in ("NSI", "NSE") or meta.get("instrumentType") != "EQUITY":
-        raise ValueError("Enter an NSE-listed equity symbol.")
+    quote_symbol = "NSE.BO" if symbol == "NSE" else symbol + ".NS"
+    expected_exchange = ("BSE", "BOM") if symbol == "NSE" else ("NSI", "NSE")
+    # A transient failure on one Yahoo endpoint should not hide a listed company.
+    for host in ("query1", "query2"):
+        try:
+            raw = json.loads(await fetch(
+                f"https://{host}.finance.yahoo.com/v8/finance/chart/{quote_symbol}?interval=1d&range=3mo&events=splits"
+            ))
+            if not raw.get("chart", {}).get("result"):
+                raise ValueError("No equity price data found for this symbol.")
+            r = raw["chart"]["result"][0]
+            meta = r.get("meta", {})
+            if meta.get("exchangeName") not in expected_exchange or meta.get("instrumentType") != "EQUITY":
+                raise ValueError("The source returned a different exchange or instrument.")
+            break
+        except (httpx.HTTPError, ValueError, KeyError, OSError):
+            if host == "query2":
+                raise
     q = r["indicators"]["quote"][0]
     bars = []
     splits = {int(v["date"]) for v in r.get("events", {}).get("splits", {}).values()}
@@ -77,15 +84,43 @@ async def prices(symbol):
         )
     result = price_signal(bars)
     if not result:
-        raise ValueError("Not enough EOD history")
+        valid = [b for b in bars if b.get("close") is not None and b.get("volume") is not None]
+        if not valid:
+            raise ValueError("No completed-session price is available")
+        last = valid[-1]
+        # Newly covered listings may expose a quote before historical bars arrive.
+        # Keep that quote; never manufacture a previous close or volume baseline.
+        result = {"close": round(last["close"], 2), "change": None,
+                  "volume": last["volume"], "volume_ratio": None,
+                  "baseline_sessions": 0, "date": last["date"], "bars": valid,
+                  "corporate_action": bool(last.get("split"))}
     result.update(
         symbol=symbol,
         name=meta.get("longName") or meta.get("shortName") or symbol,
         fetched_at=now(),
-        source=f"https://finance.yahoo.com/quote/{symbol}.NS/history/",
+        source=f"https://finance.yahoo.com/quote/{quote_symbol}/history/",
+        exchange="BSE" if symbol == "NSE" else "NSE",
     )
     put("price:" + symbol, result)
     return result
+
+
+async def market_cap(symbol):
+    """Fill a missing owner-supplied valuation with a dated, attributed source."""
+    symbol = ticker(symbol)
+    url = f"https://www.screener.in/company/{symbol}/consolidated/"
+    soup = BeautifulSoup(await fetch(url), "html.parser")
+    for row in soup.select("#top-ratios li"):
+        name, value = row.select_one(".name"), row.select_one(".number")
+        if name and value and name.get_text(" ", strip=True) == "Market Cap":
+            cap = float(value.get_text(strip=True).replace(",", ""))
+            if cap <= 0:
+                raise ValueError("Invalid market cap")
+            result = {"market_cap_cr": cap, "market_cap_source": "Screener",
+                      "market_cap_url": url, "market_cap_fetched_at": now()}
+            put("marketcap:" + symbol, result)
+            return result
+    raise ValueError("Market cap unavailable from source")
 
 
 async def announcements(days=7):
@@ -217,6 +252,12 @@ async def refresh():
             status["errors"].append({"source": "price", "symbol": s, "error": str(e)[:180]})
 
     await asyncio.gather(*(one(c["symbol"]) for c in selected_companies() if c.get("price_supported", True)))
+    # The supplied list omitted Axis Bank's valuation; refresh it independently.
+    if any(c["symbol"] == "AXISBANK" for c in selected_companies()):
+        try:
+            await market_cap("AXISBANK")
+        except Exception as e:
+            status["errors"].append({"source": "market cap", "symbol": "AXISBANK", "error": str(e)[:180]})
     try:
         status["announcements"] = await announcements()
     except Exception as e:

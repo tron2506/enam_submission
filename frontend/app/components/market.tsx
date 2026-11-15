@@ -40,7 +40,10 @@ export function PriceChart({ company }: { company: Row }) {
           <h3>
             {company.symbol} <span>Price & volume</span>
           </h3>
-          <p>{company.name}</p>
+          <p>
+            {company.name} ·{" "}
+            {company.price?.exchange || company.exchange || "NSE"}
+          </p>
         </div>
         <div className="range-control" aria-label="Chart range">
           {[20, 45].map((n) => (
@@ -60,9 +63,25 @@ export function PriceChart({ company }: { company: Row }) {
       </div>
       {bars.length < 2 ? (
         <div className="chart-empty">
-          {company.price_supported === false
-            ? "NSE price feed is unavailable for this company."
-            : "Price history is not available yet. Refresh sources to try again."}
+          {bars.length === 1 ? (
+            <>
+              <strong>₹{number(bars[0].close)}</strong>
+              <p>{day(bars[0].date)} · completed-session close</p>
+              <p>
+                The provider currently supplies one session. A history chart
+                needs at least two.
+              </p>
+              {company.price?.source && (
+                <a href={company.price.source} target="_blank" rel="noreferrer">
+                  View price source ↗
+                </a>
+              )}
+            </>
+          ) : company.price_supported === false ? (
+            "NSE price feed is unavailable for this company."
+          ) : (
+            "Price history is not available yet. Refresh sources to try again."
+          )}
         </div>
       ) : (
         <>
@@ -324,8 +343,8 @@ export function Watchlist({
             Watchlist <span className="count-label">{companies.length}</span>
           </h2>
           <p>
-            Market cap in ₹ crore · supplied snapshot, not live valuations. —
-            means unavailable.
+            Market cap in ₹ crore · supplied snapshot unless a dated source is
+            shown. — means unavailable.
           </p>
         </div>
       </div>
@@ -438,7 +457,23 @@ export function Watchlist({
                     "—"
                   ) : (
                     <>
-                      <span>{c.market_cap_cr.toLocaleString("en-IN", {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                      <span>
+                        {c.market_cap_cr.toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </span>
+                      {c.market_cap_url && (
+                        <a
+                          className="cap-source"
+                          href={c.market_cap_url}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          {c.market_cap_source} · fetched{" "}
+                          {day(c.market_cap_fetched_at)} ↗
+                        </a>
+                      )}
                       <span className="cap-track">
                         <i
                           style={{ width: `${(c.market_cap_cr / max) * 100}%` }}

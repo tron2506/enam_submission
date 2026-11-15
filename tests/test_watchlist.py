@@ -10,6 +10,9 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(core, "DATA", tmp_path)
     monkeypatch.setenv("FINN_AUTO_REFRESH", "false")
     write_windows.clear()
+    from pathlib import Path
+    from backend.bootstrap import seed_if_empty
+    seed_if_empty(Path(__file__).resolve().parents[1] / "frontend/public/snapshot.json")
     with TestClient(app) as client:
         yield client
 
@@ -23,8 +26,10 @@ def test_requested_defaults(client):
         "INFY", "SUNPHARMA", "ADANIPORTS", "TITAN", "AXISBANK",
     ]
     assert companies[0]["market_cap_cr"] == 1812818.89
-    assert companies[-1]["market_cap_cr"] is None
-    assert companies[10]["price"] is None
+    assert companies[-1]["market_cap_cr"] > 0
+    assert companies[-1]["market_cap_source"] == "Screener"
+    assert companies[10]["exchange"] == "BSE"
+    assert companies[10]["price"]["bars"]
 
 
 def test_replace_persists_order_and_drives_feeds(client, monkeypatch):
@@ -52,10 +57,13 @@ def test_replace_persists_order_and_drives_feeds(client, monkeypatch):
         called.append(symbol)
     async def announcements():
         return 0
+    async def market_cap(symbol):
+        return {}
+    monkeypatch.setattr(sources, "market_cap", market_cap)
     monkeypatch.setattr(sources, "prices", refresh_price)
     monkeypatch.setattr(sources, "announcements", announcements)
     asyncio.run(sources.refresh())
-    assert "MARUTI" in called and "JPL" not in called and "NSE" not in called
+    assert "MARUTI" in called and "JPL" not in called and "NSE" in called
 
 
 def test_invalid_duplicate_and_failed_source_preserve_watchlist(client, monkeypatch):

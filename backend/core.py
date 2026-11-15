@@ -39,15 +39,16 @@ PORTFOLIO = [(s, n, sector) for s, n, sector, _ in COMPANIES]
 CATALOG = {
     s: {"symbol": s, "name": n, "sector": sector, "market_cap_cr": cap,
         "market_cap_source": "User-supplied snapshot" if cap is not None else None,
-        "price_supported": s != "NSE"}
+        "price_supported": True, "exchange": "BSE" if s == "NSE" else "NSE"}
     for s, n, sector, cap in COMPANIES
 }
 
 
 def company(symbol):
-    return CATALOG.get(symbol) or get("company:" + symbol) or {
+    base = CATALOG.get(symbol) or get("company:" + symbol) or {
         "symbol": symbol, "name": symbol, "sector": "Other", "price_supported": True,
     }
+    return {**base, **(get("marketcap:" + symbol) or {})}
 
 
 def selected_companies():

@@ -11,6 +11,9 @@ def seed_if_empty(path: Path | None = None):
         return
     snapshot = json.loads(path.read_text())
     for company in snapshot["overview"]["companies"]:
+        cap_key = "marketcap:" + company["symbol"]
+        if company.get("market_cap_url") and get(cap_key) is None:
+            put(cap_key, {k: v for k, v in company.items() if k.startswith("market_cap_")})
         key = "price:" + company["symbol"]
         if company.get("price") and get(key) is None:
             put(key, company["price"])
